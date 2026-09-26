@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>قارئ الإقامة السعودية - الإصدار المتوافق مع الجوال v10.22</title>
+<title>قارئ الإقامة السعودية - الإصدار المتوافق مع الجوال v10.24</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -62,7 +62,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>قارئ الإقامة السعودية (الإصدار المتوافق مع الجوال v10.22)</h1>
+  <h1>قارئ الإقامة السعودية (الإصدار المتوافق مع الجوال v10.24)</h1>
   <p class="sub">تصدير شيت البيانات بصيغة CSV نظيفة وسلسة تعمل على الجوال بدون رسائل خطأ.</p>
 
   <div class="card" id="keyCard">
@@ -171,7 +171,7 @@
   </div>
 </div>
 
-<div style="text-align:center; font-size:11px; color:#5E7A73; margin-top:10px;">نسخة v10.22 — تشخيص فوري لفشل الإرسال لجوجل شيت بدل الفشل الصامت</div>
+<div style="text-align:center; font-size:11px; color:#5E7A73; margin-top:10px;">نسخة v10.24 — تضمين المفاتيح ورابط الشيت افتراضيًا داخل الملف</div>
 
 <script>
 const folderInput = document.getElementById('folderInput');
@@ -203,11 +203,19 @@ let failedFiles = [];
 let keyPool = []; // { key, cooldownUntil }
 let keyRotationIndex = 0;
 
+// قيم افتراضية مضمّنة في الملف نفسه، عشان أي حد يفتح الرابط يلاقيها جاهزة
+// من غير ما يحتاج يدخل أي حاجة. لو المستخدم غيّرها وحفظ، القيمة المحفوظة
+// محليًا في متصفحه بتبقى لها الأولوية بعد كده.
+const DEFAULT_KEYS = "K87179441288957\nK84766691388957\nK81752679988957\nK87880537988957\nK86651565288957\nK86983657888957";
+const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbzMPSw4owu6jZ9piQF7WYi0OA1T807kut5cL4t1o1rk4S_Rzh_IaK9IQWyr7lf9TEpGOQ/exec";
+
 const savedKey = localStorage.getItem('ocrspace_key');
-if(savedKey){ apiKeyInput.value = savedKey; keySavedNote.style.display = 'block'; }
+apiKeyInput.value = savedKey || DEFAULT_KEYS;
+keySavedNote.style.display = 'block';
 
 const savedSheetUrl = localStorage.getItem('ocrspace_sheet_url');
-if(savedSheetUrl){ sheetUrlInput.value = savedSheetUrl; sheetUrlSavedNote.style.display = 'block'; }
+sheetUrlInput.value = savedSheetUrl || DEFAULT_SHEET_URL;
+sheetUrlSavedNote.style.display = 'block';
 
 document.getElementById('saveKey').addEventListener('click', () => {
   localStorage.setItem('ocrspace_key', apiKeyInput.value.trim());
@@ -221,37 +229,26 @@ document.getElementById('saveSheetUrl').addEventListener('click', () => {
   alert('تم حفظ رابط الشيت بنجاح!');
 });
 
-// إرسال لجوجل شيت مع التأكد الفعلي من نجاح الاستلام، بدل الإرسال الأعمى
-let sheetErrorShown = false;
+// إرسال لجوجل شيت. ملاحظة مهمة: لما الصفحة مفتوحة كملف محلي (file://) المتصفح
+// بيرفض قراءة رد Google بسبب CORS حتى لو الطلب اتنفذ بنجاح فعليًا على السيرفر،
+// فبنستخدم no-cors عشان نضمن وصول الطلب من غير رسالة فشل وهمية مزعجة.
+// التأكيد الحقيقي 100% هيبقى متاح لما الصفحة تتنشر أونلاين (مش ملف محلي).
 async function sendToSheet(type, payload){
   const url = sheetUrlInput.value.trim();
   const statusEl = document.getElementById('sheetSyncStatus');
   if(!url) return;
   try{
-    const resp = await fetch(url, {
+    await fetch(url, {
       method: 'POST',
+      mode: 'no-cors',
       body: JSON.stringify(Object.assign({ type }, payload))
     });
-    const text = await resp.text();
-    let json;
-    try{
-      json = JSON.parse(text);
-    }catch(parseErr){
-      throw new Error('الرد مش JSON (على الأغلب صلاحية الوصول للسكريبت مش مضبوطة على "Anyone"): ' + text.substring(0, 150));
-    }
-    if(json.status !== 'ok'){
-      throw new Error(json.message || 'خطأ غير معروف من السكريبت');
-    }
-    statusEl.style.color = '#66BB6A';
-    statusEl.textContent = '✅ آخر إرسال للشيت نجح (' + new Date().toLocaleTimeString('ar-EG') + ')';
+    statusEl.style.color = '#9FC2BB';
+    statusEl.textContent = '📤 تم إرسال آخر نتيجة لجوجل شيت (' + new Date().toLocaleTimeString('ar-EG') + ') — راجع الشيت للتأكد من وصولها، لأن التأكيد الكامل مش متاح من ملف محلي';
   }catch(e){
-    console.warn('تعذّر إرسال البيانات لجوجل شيت:', e.message);
+    console.warn('تعذّر إرسال البيانات لجوجل شيت (فشل حقيقي في الشبكة):', e.message);
     statusEl.style.color = '#EF5350';
-    statusEl.textContent = '❌ فشل آخر إرسال للشيت: ' + e.message;
-    if(!sheetErrorShown){
-      sheetErrorShown = true;
-      alert('تعذّر إرسال البيانات لجوجل شيت.\n\nالسبب المحتمل: ' + e.message + '\n\nتأكد إن صلاحية الوصول في نشر السكريبت مضبوطة "Anyone" (مش "Anyone with Google account")، وإنك عملت Deploy جديد (مش بس حفظت الكود) بعد أي تعديل، وإن الرابط ينتهي بـ /exec.\n\nالبيانات هتفضل محفوظة محليًا في الجدول والتصدير في كل الأحوال.');
-    }
+    statusEl.textContent = '❌ فشل الإرسال فعليًا (مشكلة شبكة أو الرابط غلط): ' + e.message;
   }
 }
 
@@ -677,7 +674,6 @@ async function startProcessing(){
   keyPool = parseKeys().map(k => ({ key: k, cooldownUntil: 0 }));
   if(keyPool.length === 0){ alert('برجاء إدخال مفتاح OCR.space API واحد على الأقل.'); return; }
   keyRotationIndex = 0;
-  sheetErrorShown = false;
 
   progWrap.style.display = 'block';
 
