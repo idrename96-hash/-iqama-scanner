@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>قارئ الإقامة السعودية - الإصدار المتوافق مع الجوال v10.24</title>
+<title>قارئ الإقامة السعودية - الإصدار المتوافق مع الجوال v10.26</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -62,7 +62,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>قارئ الإقامة السعودية (الإصدار المتوافق مع الجوال v10.24)</h1>
+  <h1>قارئ الإقامة السعودية (الإصدار المتوافق مع الجوال v10.26)</h1>
   <p class="sub">تصدير شيت البيانات بصيغة CSV نظيفة وسلسة تعمل على الجوال بدون رسائل خطأ.</p>
 
   <div class="card" id="keyCard">
@@ -171,7 +171,7 @@
   </div>
 </div>
 
-<div style="text-align:center; font-size:11px; color:#5E7A73; margin-top:10px;">نسخة v10.24 — تضمين المفاتيح ورابط الشيت افتراضيًا داخل الملف</div>
+<div style="text-align:center; font-size:11px; color:#5E7A73; margin-top:10px;">نسخة v10.26 — إخفاء خانات المفاتيح والشيت (تظهر بإضافة ?admin=1)</div>
 
 <script>
 const folderInput = document.getElementById('folderInput');
@@ -206,14 +206,22 @@ let keyRotationIndex = 0;
 // قيم افتراضية مضمّنة في الملف نفسه، عشان أي حد يفتح الرابط يلاقيها جاهزة
 // من غير ما يحتاج يدخل أي حاجة. لو المستخدم غيّرها وحفظ، القيمة المحفوظة
 // محليًا في متصفحه بتبقى لها الأولوية بعد كده.
-const DEFAULT_KEYS = "K87179441288957\nK84766691388957\nK81752679988957\nK87880537988957\nK86651565288957\nK86983657888957";
+const DEFAULT_KEYS = "K87179441288957\nK84766691388957\nK81752679988957\nK87880537988957\nK86651565288957\nK86983657888957\nK82398197588957\nK86929632588957\nK83762693988957\nK83895385988957";
 const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbzMPSw4owu6jZ9piQF7WYi0OA1T807kut5cL4t1o1rk4S_Rzh_IaK9IQWyr7lf9TEpGOQ/exec";
 
-const savedKey = localStorage.getItem('ocrspace_key');
+// وضع الإدارة: افتح الرابط بإضافة ?admin=1 في آخره لإظهار خانات المفاتيح والشيت
+// الوضع العادي: الخانات مخفية والقيم الافتراضية المضمّنة في الملف هي المستخدمة دائمًا
+const IS_ADMIN = new URLSearchParams(location.search).get('admin') === '1';
+if(!IS_ADMIN){
+  document.getElementById('keyCard').style.display = 'none';
+  document.getElementById('sheetCard').style.display = 'none';
+}
+
+const savedKey = IS_ADMIN ? localStorage.getItem('ocrspace_key') : null;
 apiKeyInput.value = savedKey || DEFAULT_KEYS;
 keySavedNote.style.display = 'block';
 
-const savedSheetUrl = localStorage.getItem('ocrspace_sheet_url');
+const savedSheetUrl = IS_ADMIN ? localStorage.getItem('ocrspace_sheet_url') : null;
 sheetUrlInput.value = savedSheetUrl || DEFAULT_SHEET_URL;
 sheetUrlSavedNote.style.display = 'block';
 
