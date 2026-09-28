@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>قارئ الإقامة السعوديه - الإصدار المتوافق مع الجوال v10.26</title>
+<title>قارئ الإقامة السعودية - الإصدار المتوافق مع الجوال v10.27</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -32,7 +32,7 @@
   }
   label.btn:active, button:active{background:var(--gold); color:var(--ink);}
   input[type=file]{display:none;}
-  input[type=password]{
+  input[type=password], input[type=text], textarea{
     width:100%; background:var(--ink); color:var(--paper); border:1px solid var(--line);
     border-radius:8px; padding:11px 12px; font-family:inherit; font-size:14px; direction:ltr; text-align:left;
   }
@@ -62,19 +62,15 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>قارئ الإقامة السعودية (مجموعة بن لادن السعودية )</h1>
-  <p class="sub">Developer : NEGM.</p>
+  <h1>قارئ الإقامة السعودية (الإصدار المتوافق مع الجوال v10.27)</h1>
+  <p class="sub">معالجة الصور وحفظ نسخة احتياطية برقم الهوية مباشرة في جوجل درايف.</p>
 
   <div class="card" id="keyCard">
     <div class="field">
       <div class="k" style="font-size:12px; color:#9FC2BB; margin-bottom:3px;">مفاتيح OCR.space API (مجانية) — كل مفتاح على سطر منفصل</div>
-      <textarea id="apiKey" placeholder="مفتاح1&#10;مفتاح2&#10;مفتاح3" style="width:100%; min-height:70px; background:var(--ink); color:var(--paper); border:1px solid var(--line); border-radius:8px; padding:10px; font-family:inherit; font-size:13px; direction:ltr; text-align:left; resize:vertical;"></textarea>
+      <textarea id="apiKey" placeholder="مفتاح1&#10;مفتاح2&#10;مفتاح3" style="width:100%; min-height:70px; resize:vertical;"></textarea>
       <div class="key-row" style="margin-top:8px;">
         <button class="small" id="saveKey">حفظ المفاتيح</button>
-      </div>
-      <div class="note">
-        كل مفتاح مجاني محدود بـ 60 طلب/ساعة لمحرك OCR3. لمعالجة عدد كبير من الصور بسرعة، سجّل أكتر من مفتاح مجاني (كل مفتاح بإيميل مختلف من
-        <a href="https://ocr.space/ocrapi/freekey" target="_blank">هنا</a>) والصقهم كلهم هنا كل واحد في سطر — البرنامج هيلف بينهم تلقائيًا.
       </div>
       <div class="note" id="keySaved">✔ المفاتيح محفوظة</div>
     </div>
@@ -84,11 +80,8 @@
     <div class="field">
       <div class="k" style="font-size:12px; color:#9FC2BB; margin-bottom:3px;">رابط Google Sheet المشترك (Web App URL)</div>
       <div class="key-row">
-        <input type="text" id="sheetUrl" placeholder="https://script.google.com/macros/s/.../exec" style="direction:ltr; text-align:left;">
+        <input type="text" id="sheetUrl" placeholder="https://script.google.com/macros/s/.../exec">
         <button class="small" id="saveSheetUrl">حفظ</button>
-      </div>
-      <div class="note">
-        لو اتحط رابط هنا، كل نتيجة (ناجحة أو فاشلة) هتتسجل تلقائيًا في نفس الشيت المشترك، بالإضافة للعرض والتصدير المحلي زي العادة. سيب الحقل فاضي لو عايز تشتغل محليًا بس.
       </div>
       <div class="note" id="sheetUrlSaved">✔ الرابط محفوظ</div>
       <div class="note" id="sheetSyncStatus" style="font-weight:700;"></div>
@@ -171,7 +164,7 @@
   </div>
 </div>
 
-<div style="text-align:center; font-size:11px; color:#5E7A73; margin-top:10px;"> v10.26 — NEGM</div>
+<div style="text-align:center; font-size:11px; color:#5E7A73; margin-top:10px;">نسخة v10.27 — تدعم الرفع والحفظ التلقائي في درايف برقم الهوية</div>
 
 <script>
 const folderInput = document.getElementById('folderInput');
@@ -200,17 +193,11 @@ let isCancelled = false;
 let selectedFiles = [];
 let mediaStream = null;
 let failedFiles = [];
-let keyPool = []; // { key, cooldownUntil }
+let keyPool = [];
 let keyRotationIndex = 0;
 
-// قيم افتراضية مضمّنة في الملف نفسه، عشان أي حد يفتح الرابط يلاقيها جاهزة
-// من غير ما يحتاج يدخل أي حاجة. لو المستخدم غيّرها وحفظ، القيمة المحفوظة
-// محليًا في متصفحه بتبقى لها الأولوية بعد كده.
 const DEFAULT_KEYS = "K87179441288957\nK84766691388957\nK81752679988957\nK87880537988957\nK86651565288957\nK86983657888957\nK82398197588957\nK86929632588957\nK83762693988957\nK83895385988957";
-const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbzMPSw4owu6jZ9piQF7WYi0OA1T807kut5cL4t1o1rk4S_Rzh_IaK9IQWyr7lf9TEpGOQ/exec";
 
-// وضع الإدارة: افتح الرابط بإضافة ?admin=1 في آخره لإظهار خانات المفاتيح والشيت
-// الوضع العادي: الخانات مخفية والقيم الافتراضية المضمّنة في الملف هي المستخدمة دائمًا
 const IS_ADMIN = new URLSearchParams(location.search).get('admin') === '1';
 if(!IS_ADMIN){
   document.getElementById('keyCard').style.display = 'none';
@@ -222,7 +209,8 @@ apiKeyInput.value = savedKey || DEFAULT_KEYS;
 keySavedNote.style.display = 'block';
 
 const savedSheetUrl = IS_ADMIN ? localStorage.getItem('ocrspace_sheet_url') : null;
-sheetUrlInput.value = savedSheetUrl || DEFAULT_SHEET_URL;
+// إذا أردت تثبيت رابط الشيت، ضعه هنا بدل الرابط الفارغ
+sheetUrlInput.value = savedSheetUrl || "";
 sheetUrlSavedNote.style.display = 'block';
 
 document.getElementById('saveKey').addEventListener('click', () => {
@@ -237,10 +225,6 @@ document.getElementById('saveSheetUrl').addEventListener('click', () => {
   alert('تم حفظ رابط الشيت بنجاح!');
 });
 
-// إرسال لجوجل شيت. ملاحظة مهمة: لما الصفحة مفتوحة كملف محلي (file://) المتصفح
-// بيرفض قراءة رد Google بسبب CORS حتى لو الطلب اتنفذ بنجاح فعليًا على السيرفر،
-// فبنستخدم no-cors عشان نضمن وصول الطلب من غير رسالة فشل وهمية مزعجة.
-// التأكيد الحقيقي 100% هيبقى متاح لما الصفحة تتنشر أونلاين (مش ملف محلي).
 async function sendToSheet(type, payload){
   const url = sheetUrlInput.value.trim();
   const statusEl = document.getElementById('sheetSyncStatus');
@@ -252,11 +236,10 @@ async function sendToSheet(type, payload){
       body: JSON.stringify(Object.assign({ type }, payload))
     });
     statusEl.style.color = '#9FC2BB';
-    statusEl.textContent = '📤 تم إرسال آخر نتيجة لجوجل شيت (' + new Date().toLocaleTimeString('ar-EG') + ') — راجع الشيت للتأكد من وصولها، لأن التأكيد الكامل مش متاح من ملف محلي';
+    statusEl.textContent = '📤 تم إرسال وحفظ الإقامة لجوجل درايف والشيت (' + new Date().toLocaleTimeString('ar-EG') + ')';
   }catch(e){
-    console.warn('تعذّر إرسال البيانات لجوجل شيت (فشل حقيقي في الشبكة):', e.message);
     statusEl.style.color = '#EF5350';
-    statusEl.textContent = '❌ فشل الإرسال فعليًا (مشكلة شبكة أو الرابط غلط): ' + e.message;
+    statusEl.textContent = '❌ فشل الإرسال فعليًا: ' + e.message;
   }
 }
 
@@ -264,7 +247,6 @@ function parseKeys(){
   return apiKeyInput.value.split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
 }
 
-// يختار أول مفتاح متاح (مش في فترة تبريد بسبب حد استخدام)، أو الأقرب للتعافي لو كلهم متبردين
 function pickAvailableKey(){
   const now = Date.now();
   const available = keyPool.filter(k => k.cooldownUntil <= now);
@@ -273,7 +255,6 @@ function pickAvailableKey(){
     keyRotationIndex++;
     return k;
   }
-  // كل المفاتيح متبردة: رجّع أقربهم للتعافي مع وقت الانتظار المطلوب
   const soonest = keyPool.reduce((a, b) => a.cooldownUntil < b.cooldownUntil ? a : b);
   return soonest;
 }
@@ -575,8 +556,6 @@ function processFullQuality(file){
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
 
-    // بدون هذه المهلة، أي صورة تالفة أو ثقيلة جدًا كانت بتعلّق العملية للأبد
-    // وتوقف باقي الصور في الطابور — ده كان سبب توقف المعالجة عند رقم معين
     const timeoutId = setTimeout(() => {
       URL.revokeObjectURL(objectUrl);
       reject(new Error('انتهت مهلة تحميل الصورة (ملف تالف أو كبير جدًا)'));
@@ -585,8 +564,6 @@ function processFullQuality(file){
     img.onload = () => {
       clearTimeout(timeoutId);
       try {
-        // تصغير الصور الكبيرة جدًا: يقلل استهلاك الذاكرة على الجوال،
-        // يسرّع الرفع، ويحافظ على البقاء تحت حد 1MB لكل صورة في OCR.space
         const maxDim = 2000;
         const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
         const canvas = document.createElement('canvas');
@@ -628,7 +605,7 @@ async function callOcrWithKey(base64Img, keyEntry){
     let retryAfter = 3660;
     try{ retryAfter = JSON.parse(rawText).retryAfter || retryAfter; }catch(e){}
     keyEntry.cooldownUntil = Date.now() + (retryAfter * 1000) + 2000;
-    const err = new Error('تجاوز المفتاح حد الاستخدام (60 طلب/ساعة) — سيُستراح ' + Math.ceil(retryAfter/60) + ' دقيقة قبل إعادة استخدامه');
+    const err = new Error('تجاوز المفتاح حد الاستخدام');
     err.isRateLimit = true;
     throw err;
   }
@@ -641,17 +618,18 @@ async function callOcrWithKey(base64Img, keyEntry){
   try{
     json = JSON.parse(rawText);
   }catch(parseErr){
-    throw new Error('الرد مش JSON صالح (على الأغلب رسالة من OCR.space): ' + rawText.substring(0, 200));
+    throw new Error('الرد مش JSON صالح: ' + rawText.substring(0, 200));
   }
 
   if(json.IsErroredOnProcessing || !json.ParsedResults){
-    const reason = json.ErrorMessage ? (Array.isArray(json.ErrorMessage) ? json.ErrorMessage.join(' ') : json.ErrorMessage) : (json.ErrorDetails || 'رفضت الخدمة معالجة الصورة بدون سبب واضح');
+    const reason = json.ErrorMessage ? (Array.isArray(json.ErrorMessage) ? json.ErrorMessage.join(' ') : json.ErrorMessage) : (json.ErrorDetails || 'مجهول');
     throw new Error(reason);
   }
 
   return json;
 }
 
+// تعديل الدالة لترجع الصورة جنباً إلى جنب مع نتيجة الـ OCR
 async function processOneFile(file, attemptsLeft){
   const base64Img = await processFullQuality(file);
   let lastErr = null;
@@ -660,34 +638,35 @@ async function processOneFile(file, attemptsLeft){
     const keyEntry = pickAvailableKey();
     const waitMs = keyEntry.cooldownUntil - Date.now();
     if(waitMs > 0){
-      progLabel.textContent = `⏳ كل المفاتيح المتاحة وصلت لحد الاستخدام — الانتظار ${Math.ceil(waitMs/60000)} دقيقة قبل الاستكمال (الملف: ${file.name})`;
+      progLabel.textContent = `⏳ انتظار ${Math.ceil(waitMs/60000)} دقيقة (الملف: ${file.name})`;
       await new Promise(r => setTimeout(r, Math.min(waitMs, 65000)));
-      continue; // بعد الانتظار (أو جزء منه) أعد فحص المفاتيح المتاحة
+      continue;
     }
     try{
-      return await callOcrWithKey(base64Img, keyEntry);
+      const json = await callOcrWithKey(base64Img, keyEntry);
+      return { json, base64Img }; // إرجاع النص والصورة
     }catch(err){
       lastErr = err;
       if(err.isRateLimit){
-        attemptsLeft--; // جرّب مفتاح تاني (أو نفس المفتاح بعد التبريد) في اللفة الجاية
+        attemptsLeft--;
         continue;
       }
-      throw err; // خطأ غير متعلق بحد الاستخدام: فشل الملف مباشرة
+      throw err;
     }
   }
-  throw lastErr || new Error('تعذّرت المعالجة بعد استنفاد كل المفاتيح المتاحة');
+  throw lastErr || new Error('تعذّرت المعالجة بعد استنفاد المفاتيح');
 }
 
 async function startProcessing(){
   keyPool = parseKeys().map(k => ({ key: k, cooldownUntil: 0 }));
-  if(keyPool.length === 0){ alert('برجاء إدخال مفتاح OCR.space API واحد على الأقل.'); return; }
+  if(keyPool.length === 0){ alert('برجاء إدخال مفتاح OCR.space API.'); return; }
   keyRotationIndex = 0;
 
   progWrap.style.display = 'block';
 
   for(let i = 0; i < selectedFiles.length; i++){
     if(isCancelled){
-      progLabel.textContent = `⏹️ تم الإيقاف. تمت معالجة (${processedData.length}) صورة بنجاح.`;
+      progLabel.textContent = `⏹️ تم الإيقاف.`;
       stopBtn.style.display = 'none';
       return;
     }
@@ -698,7 +677,7 @@ async function startProcessing(){
     progLabel.textContent = `جاري معالجة الملف (${i + 1} من ${selectedFiles.length}): ${file.name}`;
 
     try {
-      const json = await processOneFile(file, keyPool.length * 3);
+      const { json, base64Img } = await processOneFile(file, keyPool.length * 3);
       const text = json.ParsedResults.map(r => r.ParsedText).join('\n');
       const normText = normalizeDigits(text);
       const f = extractFields(normText);
@@ -715,7 +694,8 @@ async function startProcessing(){
         profession: f.profession,
         empName: f.empName,
         empId: f.empId,
-        ext: ext
+        ext: ext,
+        imageBase64: base64Img // إرسال بيانات الصورة إلى جوجل شيت
       };
 
       processedData.push(item);
@@ -734,21 +714,16 @@ async function startProcessing(){
   }
 
   progFill.style.width = '100%';
-  const failNote = failedFiles.length ? ` — تعذّرت قراءة (${failedFiles.length}) صورة (التفاصيل في جدول "الصور الفاشلة" تحت)` : '';
-  progLabel.textContent = `✅ تمت معالجة (${processedData.length}) صورة بنجاح من أصل (${selectedFiles.length})${failNote}`;
+  progLabel.textContent = `✅ تمت معالجة (${processedData.length}) صورة بنجاح.`;
   stopBtn.style.display = 'none';
 }
 
-// تصدير ملف CSV الحقيقي المتوافق مع الجوال وبرامج الـ Excel
 document.getElementById('downloadExcel').addEventListener('click', () => {
   if(processedData.length === 0) return;
-
   let csvContent = "\uFEFFم,الاسم بالعربي,الاسم بالإنجليزية,رقم الهوية,تاريخ الميلاد,الانتهاء,الجنسية,المهنة,صاحب العمل,هوية صاحب العمل\n";
-  
   processedData.forEach((row, idx) => {
     csvContent += `"${idx + 1}","${row.nameAr}","${row.nameEn}","${row.idNumber}","${row.dob}","${row.expiry}","${row.nationality}","${row.profession}","${row.empName}","${row.empId}"\n`;
   });
-
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -761,17 +736,13 @@ document.getElementById('downloadExcel').addEventListener('click', () => {
 
 document.getElementById('downloadBat').addEventListener('click', () => {
   if(processedData.length === 0) return;
-
   let batContent = "@echo off\r\nchcp 65001 > nul\r\necho جاري إعادة تسمية الصور المعالجة...\r\n\r\n";
-  
   processedData.forEach(row => {
     if(row.idNumber && row.idNumber !== 'غير_متوفر'){
       batContent += `ren "${row.fileName}" "${row.idNumber}${row.ext}"\r\r\n`;
     }
   });
-
   batContent += "\r\necho.\r\necho تم الانتهاء من إعادة تسمية الصور بنجاح!\r\npause\r\n";
-
   const blob = new Blob([batContent], { type: 'text/plain;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const aElem = document.createElement('a');
@@ -784,13 +755,11 @@ document.getElementById('downloadBat').addEventListener('click', () => {
 
 document.getElementById('downloadFailed').addEventListener('click', () => {
   if(failedFiles.length === 0) return;
-
   let csvContent = "\uFEFFم,اسم الملف,سبب الفشل\n";
   failedFiles.forEach((f, idx) => {
     const safeReason = (f.reason || '').replace(/"/g, '""');
     csvContent += `"${idx + 1}","${f.name}","${safeReason}"\n`;
   });
-
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
