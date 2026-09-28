@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>قارئ الإقامة السعودية - الإصدار المتوافق مع الجوال v10.27</title>
+<title>قارئ الإقامة السعودية - الإصدار المتوافق مع الجوال v10.28</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -62,7 +62,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>قارئ الإقامة السعودية (الإصدار المتوافق مع الجوال v10.27)</h1>
+  <h1>قارئ الإقامة السعودية (الإصدار المتوافق مع الجوال v10.28)</h1>
   <p class="sub">معالجة الصور وحفظ نسخة احتياطية برقم الهوية مباشرة في جوجل درايف.</p>
 
   <div class="card" id="keyCard">
@@ -164,7 +164,7 @@
   </div>
 </div>
 
-<div style="text-align:center; font-size:11px; color:#5E7A73; margin-top:10px;">نسخة v10.27 — تدعم الرفع والحفظ التلقائي في درايف برقم الهوية</div>
+<div style="text-align:center; font-size:11px; color:#5E7A73; margin-top:10px;">نسخة v10.28 — تدعم الرفع والحفظ التلقائي في درايف برقم الهوية</div>
 
 <script>
 const folderInput = document.getElementById('folderInput');
@@ -196,7 +196,9 @@ let failedFiles = [];
 let keyPool = [];
 let keyRotationIndex = 0;
 
-const DEFAULT_KEYS = "K87179441288957\nK84766691388957\nK81752679988957\nK87880537988957\nK86651565288957\nK86983657888957\nK82398197588957\nK86929632588957\nK83762693988957\nK83895385988957";
+// تركناها فارغة لأمان حسابك عند رفع الكود على GitHub
+const DEFAULT_KEYS = "";
+const DEFAULT_SHEET_URL = "";
 
 const IS_ADMIN = new URLSearchParams(location.search).get('admin') === '1';
 if(!IS_ADMIN){
@@ -206,12 +208,11 @@ if(!IS_ADMIN){
 
 const savedKey = IS_ADMIN ? localStorage.getItem('ocrspace_key') : null;
 apiKeyInput.value = savedKey || DEFAULT_KEYS;
-keySavedNote.style.display = 'block';
+if(savedKey) keySavedNote.style.display = 'block';
 
 const savedSheetUrl = IS_ADMIN ? localStorage.getItem('ocrspace_sheet_url') : null;
-// إذا أردت تثبيت رابط الشيت، ضعه هنا بدل الرابط الفارغ
-sheetUrlInput.value = savedSheetUrl || "";
-sheetUrlSavedNote.style.display = 'block';
+sheetUrlInput.value = savedSheetUrl || DEFAULT_SHEET_URL;
+if(savedSheetUrl) sheetUrlSavedNote.style.display = 'block';
 
 document.getElementById('saveKey').addEventListener('click', () => {
   localStorage.setItem('ocrspace_key', apiKeyInput.value.trim());
@@ -225,21 +226,29 @@ document.getElementById('saveSheetUrl').addEventListener('click', () => {
   alert('تم حفظ رابط الشيت بنجاح!');
 });
 
+// الدالة المُحدثة للإرسال بنظام URLSearchParams لتفادي حظر الصور الكبيرة
 async function sendToSheet(type, payload){
   const url = sheetUrlInput.value.trim();
   const statusEl = document.getElementById('sheetSyncStatus');
   if(!url) return;
   try{
+    const formData = new URLSearchParams();
+    formData.append('data', JSON.stringify(Object.assign({ type }, payload)));
+
     await fetch(url, {
       method: 'POST',
       mode: 'no-cors',
-      body: JSON.stringify(Object.assign({ type }, payload))
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: formData.toString()
     });
+
     statusEl.style.color = '#9FC2BB';
-    statusEl.textContent = '📤 تم إرسال وحفظ الإقامة لجوجل درايف والشيت (' + new Date().toLocaleTimeString('ar-EG') + ')';
+    statusEl.textContent = '📤 تم إرسال البيانات والصورة بنجاح (' + new Date().toLocaleTimeString('ar-EG') + ')';
   }catch(e){
     statusEl.style.color = '#EF5350';
-    statusEl.textContent = '❌ فشل الإرسال فعليًا: ' + e.message;
+    statusEl.textContent = '❌ فشل الإرسال: ' + e.message;
   }
 }
 
@@ -629,7 +638,6 @@ async function callOcrWithKey(base64Img, keyEntry){
   return json;
 }
 
-// تعديل الدالة لترجع الصورة جنباً إلى جنب مع نتيجة الـ OCR
 async function processOneFile(file, attemptsLeft){
   const base64Img = await processFullQuality(file);
   let lastErr = null;
@@ -644,7 +652,7 @@ async function processOneFile(file, attemptsLeft){
     }
     try{
       const json = await callOcrWithKey(base64Img, keyEntry);
-      return { json, base64Img }; // إرجاع النص والصورة
+      return { json, base64Img };
     }catch(err){
       lastErr = err;
       if(err.isRateLimit){
@@ -695,7 +703,7 @@ async function startProcessing(){
         empName: f.empName,
         empId: f.empId,
         ext: ext,
-        imageBase64: base64Img // إرسال بيانات الصورة إلى جوجل شيت
+        imageBase64: base64Img // إرفاق الصورة للإرسال
       };
 
       processedData.push(item);
