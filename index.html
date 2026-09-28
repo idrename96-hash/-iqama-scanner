@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>قارئ الإقامة  - الإصدار المتوافق مع الجوال v10.28</title>
+<title>قارئ الإقامة السعودية - الإصدار المتوافق مع الجوال v10.28</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -62,7 +62,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>قارئ الإقامة  (الإصدار المتوافق مع الجوال v10.28)</h1>
+  <h1>قارئ الإقامة السعودية (الإصدار المتوافق مع الجوال v10.28)</h1>
   <p class="sub">معالجة الصور وحفظ نسخة احتياطية برقم الهوية مباشرة في جوجل درايف.</p>
 
   <div class="card" id="keyCard">
@@ -80,7 +80,7 @@
     <div class="field">
       <div class="k" style="font-size:12px; color:#9FC2BB; margin-bottom:3px;">رابط Google Sheet المشترك (Web App URL)</div>
       <div class="key-row">
-        <input type="text" id="sheetUrl" placeholder="https://script.google.com/macros/s/AKfycbzMPSw4owu6jZ9piQF7WYi0OA1T807kut5cL4t1o1rk4S_Rzh_IaK9IQWyr7lf9TEpGOQ/exec">
+        <input type="text" id="sheetUrl" placeholder="https://script.google.com/macros/s/.../exec">
         <button class="small" id="saveSheetUrl">حفظ</button>
       </div>
       <div class="note" id="sheetUrlSaved">✔ الرابط محفوظ</div>
@@ -196,9 +196,9 @@ let failedFiles = [];
 let keyPool = [];
 let keyRotationIndex = 0;
 
-// تركناها فارغة لأمان حسابك عند رفع الكود على GitHub
-const DEFAULT_KEYS = "";
-const DEFAULT_SHEET_URL = "";
+// إرجاع المفاتيح والرابط القديم كما طلبت
+const DEFAULT_KEYS = "K87179441288957\nK84766691388957\nK81752679988957\nK87880537988957\nK86651565288957\nK86983657888957\nK82398197588957\nK86929632588957\nK83762693988957\nK83895385988957";
+const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbzMPSw4owu6jZ9piQF7WYi0OA1T807kut5cL4t1o1rk4S_Rzh_IaK9IQWyr7lf9TEpGOQ/exec";
 
 const IS_ADMIN = new URLSearchParams(location.search).get('admin') === '1';
 if(!IS_ADMIN){
@@ -208,11 +208,11 @@ if(!IS_ADMIN){
 
 const savedKey = IS_ADMIN ? localStorage.getItem('ocrspace_key') : null;
 apiKeyInput.value = savedKey || DEFAULT_KEYS;
-if(savedKey) keySavedNote.style.display = 'block';
+if(savedKey || DEFAULT_KEYS) keySavedNote.style.display = 'block';
 
 const savedSheetUrl = IS_ADMIN ? localStorage.getItem('ocrspace_sheet_url') : null;
 sheetUrlInput.value = savedSheetUrl || DEFAULT_SHEET_URL;
-if(savedSheetUrl) sheetUrlSavedNote.style.display = 'block';
+if(savedSheetUrl || DEFAULT_SHEET_URL) sheetUrlSavedNote.style.display = 'block';
 
 document.getElementById('saveKey').addEventListener('click', () => {
   localStorage.setItem('ocrspace_key', apiKeyInput.value.trim());
