@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>قارئ الإقامة السعودية - الإصدار المتوافق مع الجوال v10.28</title>
+<title>قارئ الإقامة السعودية - الإصدار الموحد v10.30</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -51,9 +51,16 @@
   th{background:var(--teal2); color:var(--gold-soft);}
   .table-container{max-height:320px; overflow-y:auto; margin-top:10px;}
   a{color:var(--gold-soft);}
-  #keySaved{display:none;}
+  #keySaved, #sheetUrlSaved{display:none;}
   .key-row{display:flex; gap:8px;}
   #folderStatus{font-size:13px; color:var(--gold-soft); margin-top:8px;}
+  
+  /* تصميم العداد المركزي */
+  #globalCounter {
+    background: #0d1b18; border: 1px solid var(--gold); border-radius: 8px;
+    padding: 12px; text-align: center; margin-bottom: 16px; display: none;
+  }
+  #globalCounter span { font-size: 20px; font-weight: bold; color: var(--gold); }
   
   #camModal{display:none; position:fixed; inset:0; background:#000c; z-index:999; align-items:center; justify-content:center; padding:16px;}
   .cam-box{background:var(--teal); border:1px solid var(--line); border-radius:14px; padding:16px; max-width:500px; width:100%; text-align:center;}
@@ -62,8 +69,8 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>قارئ بيانات الهوية</h1>
-  <p class="sub">DEVELOPER:BY NEGM.</p>
+  <h1>قارئ الإقامة السعودية (v10.30)</h1>
+  <p class="sub">إصدار الفريق: متصل بقاعدة البيانات مع عداد مركزي للاستهلاك.</p>
 
   <div class="card" id="keyCard">
     <div class="field">
@@ -84,11 +91,16 @@
         <button class="small" id="saveSheetUrl">حفظ</button>
       </div>
       <div class="note" id="sheetUrlSaved">✔ الرابط محفوظ</div>
-      <div class="note" id="sheetSyncStatus" style="font-weight:700;"></div>
+      <div class="note" id="sheetSyncStatus" style="font-weight:700; margin-top:6px;"></div>
     </div>
   </div>
 
   <div class="card">
+    <div id="globalCounter">
+       إجمالي استهلاك الفريق اليوم: <br>
+       <span id="counterValue">... جاري التحميل ...</span>
+    </div>
+
     <div class="btn-row">
       <label class="btn" for="folderInput">📁 مجلد صور</label>
       <label class="btn" for="fileInput">🖼️ صور متعددة / فردية</label>
@@ -123,6 +135,7 @@
             <th>المهنة</th>
             <th>صاحب العمل</th>
             <th>هوية صاحب العمل</th>
+            <th>ملاحظات</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -164,39 +177,12 @@
   </div>
 </div>
 
-<div style="text-align:center; font-size:11px; color:#5E7A73; margin-top:10px;">نسخة v10.28 — تم تطوير بواسطة نجم</div>
+<div style="text-align:center; font-size:11px; color:#5E7A73; margin-top:10px;">نسخة v10.30 الموحدة</div>
 
 <script>
-const folderInput = document.getElementById('folderInput');
-const fileInput = document.getElementById('fileInput');
-const openCamBtn = document.getElementById('openCamBtn');
-const camModal = document.getElementById('camModal');
-const camVideo = document.getElementById('camVideo');
-const takePicBtn = document.getElementById('takePicBtn');
-const closeCamBtn = document.getElementById('closeCamBtn');
-
-const folderStatus = document.getElementById('folderStatus');
-const progWrap = document.getElementById('progWrap');
-const progFill = document.getElementById('progFill');
-const progLabel = document.getElementById('progLabel');
-const stopBtn = document.getElementById('stopBtn');
-const resultsCard = document.getElementById('resultsCard');
-const tableBody = document.getElementById('tableBody');
-const countSpan = document.getElementById('countSpan');
-const apiKeyInput = document.getElementById('apiKey');
-const keySavedNote = document.getElementById('keySaved');
-const sheetUrlInput = document.getElementById('sheetUrl');
-const sheetUrlSavedNote = document.getElementById('sheetUrlSaved');
-
-let processedData = [];
-let isCancelled = false;
-let selectedFiles = [];
-let mediaStream = null;
-let failedFiles = [];
-let keyPool = [];
-let keyRotationIndex = 0;
-
-// إرجاع المفاتيح والرابط القديم كما طلبت
+// ==========================================
+// الإعدادات والروابط المخفية
+// ==========================================
 const DEFAULT_KEYS = "K87179441288957\nK84766691388957\nK81752679988957\nK87880537988957\nK86651565288957\nK86983657888957\nK82398197588957\nK86929632588957\nK83762693988957\nK83895385988957";
 const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbzMPSw4owu6jZ9piQF7WYi0OA1T807kut5cL4t1o1rk4S_Rzh_IaK9IQWyr7lf9TEpGOQ/exec";
 
@@ -206,27 +192,46 @@ if(!IS_ADMIN){
   document.getElementById('sheetCard').style.display = 'none';
 }
 
-const savedKey = IS_ADMIN ? localStorage.getItem('ocrspace_key') : null;
-apiKeyInput.value = savedKey || DEFAULT_KEYS;
-if(savedKey || DEFAULT_KEYS) keySavedNote.style.display = 'block';
-
-const savedSheetUrl = IS_ADMIN ? localStorage.getItem('ocrspace_sheet_url') : null;
-sheetUrlInput.value = savedSheetUrl || DEFAULT_SHEET_URL;
-if(savedSheetUrl || DEFAULT_SHEET_URL) sheetUrlSavedNote.style.display = 'block';
+const apiKeyInput = document.getElementById('apiKey');
+const sheetUrlInput = document.getElementById('sheetUrl');
+apiKeyInput.value = localStorage.getItem('ocrspace_key') || DEFAULT_KEYS;
+sheetUrlInput.value = localStorage.getItem('ocrspace_sheet_url') || DEFAULT_SHEET_URL;
 
 document.getElementById('saveKey').addEventListener('click', () => {
-  localStorage.setItem('ocrspace_key', apiKeyInput.value.trim());
-  keySavedNote.style.display = 'block';
-  alert('تم حفظ المفاتيح بنجاح!');
+  localStorage.setItem('ocrspace_key', apiKeyInput.value.trim()); alert('تم الحفظ!');
 });
-
 document.getElementById('saveSheetUrl').addEventListener('click', () => {
-  localStorage.setItem('ocrspace_sheet_url', sheetUrlInput.value.trim());
-  sheetUrlSavedNote.style.display = 'block';
-  alert('تم حفظ رابط الشيت بنجاح!');
+  localStorage.setItem('ocrspace_sheet_url', sheetUrlInput.value.trim()); alert('تم الحفظ!');
+  fetchGlobalCount(); // تحديث العداد بالرابط الجديد
 });
 
-// الدالة المُحدثة للإرسال بنظام URLSearchParams لتفادي حظر الصور الكبيرة
+// ==========================================
+// العداد المركزي (من الشيت)
+// ==========================================
+function fetchGlobalCount() {
+  const url = sheetUrlInput.value.trim();
+  if(!url) return;
+  
+  document.getElementById('globalCounter').style.display = 'block';
+  
+  // طلب JSONP لتخطي الـ CORS وجلب العداد
+  const script = document.createElement('script');
+  script.src = url + "?callback=updateGlobalCountUI&t=" + Date.now();
+  document.body.appendChild(script);
+}
+
+window.updateGlobalCountUI = function(data) {
+  if(data && data.count !== undefined) {
+    document.getElementById('counterValue').textContent = data.count + " صورة";
+  }
+};
+
+// تشغيل العداد فور فتح الصفحة
+window.addEventListener('load', fetchGlobalCount);
+
+// ==========================================
+// إرسال البيانات لجوجل شيت (مع تفادي الـ CORS)
+// ==========================================
 async function sendToSheet(type, payload){
   const url = sheetUrlInput.value.trim();
   const statusEl = document.getElementById('sheetSyncStatus');
@@ -238,34 +243,58 @@ async function sendToSheet(type, payload){
     await fetch(url, {
       method: 'POST',
       mode: 'no-cors',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData.toString()
     });
 
     statusEl.style.color = '#9FC2BB';
-    statusEl.textContent = '📤 تم إرسال البيانات والصورة بنجاح (' + new Date().toLocaleTimeString('ar-EG') + ')';
+    statusEl.textContent = '📤 تم الحفظ في قاعدة البيانات بنجاح';
+    
+    // تحديث العداد المركزي بعد كل إرسال
+    fetchGlobalCount();
   }catch(e){
     statusEl.style.color = '#EF5350';
-    statusEl.textContent = '❌ فشل الإرسال: ' + e.message;
+    statusEl.textContent = '❌ فشل الإرسال للقاعدة: ' + e.message;
   }
 }
 
-function parseKeys(){
-  return apiKeyInput.value.split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
-}
+// ==========================================
+// باقي أكواد التطبيق والمعالجة
+// ==========================================
+const folderInput = document.getElementById('folderInput');
+const fileInput = document.getElementById('fileInput');
+const openCamBtn = document.getElementById('openCamBtn');
+const camModal = document.getElementById('camModal');
+const camVideo = document.getElementById('camVideo');
+const takePicBtn = document.getElementById('takePicBtn');
+const closeCamBtn = document.getElementById('closeCamBtn');
+const folderStatus = document.getElementById('folderStatus');
+const progWrap = document.getElementById('progWrap');
+const progFill = document.getElementById('progFill');
+const progLabel = document.getElementById('progLabel');
+const stopBtn = document.getElementById('stopBtn');
+const resultsCard = document.getElementById('resultsCard');
+const tableBody = document.getElementById('tableBody');
+const countSpan = document.getElementById('countSpan');
+
+let processedData = [];
+let isCancelled = false;
+let selectedFiles = [];
+let mediaStream = null;
+let failedFiles = [];
+let keyPool = [];
+let keyRotationIndex = 0;
+
+function parseKeys(){ return apiKeyInput.value.split(/[\n,]+/).map(k => k.trim()).filter(Boolean); }
 
 function pickAvailableKey(){
   const now = Date.now();
   const available = keyPool.filter(k => k.cooldownUntil <= now);
   if(available.length > 0){
     const k = available[keyRotationIndex % available.length];
-    keyRotationIndex++;
-    return k;
+    keyRotationIndex++; return k;
   }
-  const soonest = keyPool.reduce((a, b) => a.cooldownUntil < b.cooldownUntil ? a : b);
-  return soonest;
+  return keyPool.reduce((a, b) => a.cooldownUntil < b.cooldownUntil ? a : b);
 }
 
 folderInput.addEventListener('change', (e) => handleSelectedFiles(Array.from(e.target.files), 'مجلد'));
@@ -274,38 +303,25 @@ fileInput.addEventListener('change', (e) => handleSelectedFiles(Array.from(e.tar
 openCamBtn.addEventListener('click', async () => {
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    camVideo.srcObject = mediaStream;
-    camModal.style.display = 'flex';
-  } catch(err) {
-    alert('تعذر الوصول إلى الكاميرا. تأكد من إعطاء الصلاحيات اللازمة.');
-  }
+    camVideo.srcObject = mediaStream; camModal.style.display = 'flex';
+  } catch(err) { alert('تعذر الوصول إلى الكاميرا.'); }
 });
 
 takePicBtn.addEventListener('click', () => {
   const canvas = document.createElement('canvas');
-  canvas.width = camVideo.videoWidth || 1280;
-  canvas.height = camVideo.videoHeight || 720;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(camVideo, 0, 0, canvas.width, canvas.height);
-  
+  canvas.width = camVideo.videoWidth || 1280; canvas.height = camVideo.videoHeight || 720;
+  canvas.getContext('2d').drawImage(camVideo, 0, 0, canvas.width, canvas.height);
   canvas.toBlob(blob => {
     const camFile = new File([blob], `Camera_ID_${Date.now()}.jpg`, { type: 'image/jpeg' });
-    stopCameraStream();
-    camModal.style.display = 'none';
-    handleSelectedFiles([camFile], 'تقاط كاميرا');
+    stopCameraStream(); camModal.style.display = 'none';
+    handleSelectedFiles([camFile], 'التقاط كاميرا');
   }, 'image/jpeg', 1.0);
 });
 
-closeCamBtn.addEventListener('click', () => {
-  stopCameraStream();
-  camModal.style.display = 'none';
-});
+closeCamBtn.addEventListener('click', () => { stopCameraStream(); camModal.style.display = 'none'; });
 
 function stopCameraStream(){
-  if(mediaStream){
-    mediaStream.getTracks().forEach(track => track.stop());
-    mediaStream = null;
-  }
+  if(mediaStream){ mediaStream.getTracks().forEach(track => track.stop()); mediaStream = null; }
 }
 
 function handleSelectedFiles(files, sourceType){
@@ -313,29 +329,17 @@ function handleSelectedFiles(files, sourceType){
     const name = f.name.toLowerCase();
     return f.type.startsWith('image/') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp');
   });
-  
   if(selectedFiles.length > 0){
     folderStatus.textContent = `📁 تم اختيار (${selectedFiles.length}) صورة عبر (${sourceType}) للمعالجة.`;
-    processedData = [];
-    failedFiles = [];
-    tableBody.innerHTML = '';
-    document.getElementById('failedBody').innerHTML = '';
-    document.getElementById('failedCard').style.display = 'none';
-    resultsCard.style.display = 'none';
-    isCancelled = false;
-    stopBtn.style.display = 'block';
-    stopBtn.textContent = '🛑 إيقاف وحفظ';
+    processedData = []; failedFiles = []; tableBody.innerHTML = '';
+    document.getElementById('failedBody').innerHTML = ''; document.getElementById('failedCard').style.display = 'none';
+    resultsCard.style.display = 'none'; isCancelled = false;
+    stopBtn.style.display = 'block'; stopBtn.textContent = '🛑 إيقاف وحفظ';
     startProcessing();
-  } else {
-    folderStatus.textContent = '⚠️ لم يتم العثور على صور صالحة.';
-  }
+  } else { folderStatus.textContent = '⚠️️ لم يتم العثور على صور صالحة.'; }
 }
 
-stopBtn.addEventListener('click', () => {
-  isCancelled = true;
-  stopBtn.disabled = true;
-  stopBtn.textContent = 'جاري الإيقاف...';
-});
+stopBtn.addEventListener('click', () => { isCancelled = true; stopBtn.disabled = true; stopBtn.textContent = 'جاري الإيقاف...'; });
 
 function addRowToTable(row, index){
   resultsCard.style.display = 'block';
@@ -351,9 +355,9 @@ function addRowToTable(row, index){
     <td>${row.profession}</td>
     <td>${row.empName}</td>
     <td style="direction:ltr;">${row.empId}</td>
+    <td style="color:${row.notes ? '#FFCC80' : 'inherit'}; font-weight:${row.notes ? 'bold' : 'normal'}">${row.notes || '-'}</td>
   `;
-  tableBody.appendChild(tr);
-  countSpan.textContent = processedData.length;
+  tableBody.appendChild(tr); countSpan.textContent = processedData.length;
 }
 
 function addFailedRowToTable(fileName, reason){
@@ -362,31 +366,20 @@ function addFailedRowToTable(fileName, reason){
   failedCard.style.display = 'block';
   const tr = document.createElement('tr');
   tr.innerHTML = `<td style="direction:ltr; text-align:left;">${fileName}</td><td>${reason}</td>`;
-  failedBody.appendChild(tr);
-  document.getElementById('failedCountSpan').textContent = failedFiles.length;
+  failedBody.appendChild(tr); document.getElementById('failedCountSpan').textContent = failedFiles.length;
 }
 
 function normalizeDigits(str){
-  const easternArabic = '٠١٢٣٤٥٦٧٨٩';
-  const persian = '۰۱۲۳۴۵۶۷۸۹';
+  const easternArabic = '٠١٢٣٤٥٦٧٨٩'; const persian = '۰۱۲۳۴۵۶۷۸۹';
   return str.replace(/[٠-٩۰-۹]/g, ch => {
-    let idx = easternArabic.indexOf(ch);
-    if(idx === -1) idx = persian.indexOf(ch);
+    let idx = easternArabic.indexOf(ch); if(idx === -1) idx = persian.indexOf(ch);
     return idx !== -1 ? idx : ch;
   });
 }
 
-const exactNationalities = [
-  'مصر', 'اليمن', 'بنجلاديش', 'باكستان', 'الهند', 'الصومال', 'سوريا', 'لبنان', 'الاردن', 'الأردن', 'فلسطين', 'بورما'
-];
-
+const exactNationalities = ['مصر', 'اليمن', 'بنجلاديش', 'باكستان', 'الهند', 'الصومال', 'سوريا', 'لبنان', 'الاردن', 'الأردن', 'فلسطين', 'بورما'];
 function matchStrictNationality(text){
-  for(let nat of exactNationalities){
-    if(text.includes(nat)){
-      return nat;
-    }
-  }
-  return '';
+  for(let nat of exactNationalities){ if(text.includes(nat)) return nat; } return '';
 }
 
 function parseAndFixDate(str){
@@ -395,22 +388,47 @@ function parseAndFixDate(str){
   if(m) return `${m[1]}/${m[2].padStart(2, '0')}/${m[3].padStart(2, '0')}`;
   m = str.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
   if(m){
-    let y = m[3];
-    if(y.length === 2) y = (parseInt(y, 10) > 50 ? '19' : '20') + y;
+    let y = m[3]; if(y.length === 2) y = (parseInt(y, 10) > 50 ? '19' : '20') + y;
     return `${y}/${m[2].padStart(2, '0')}/${m[1].padStart(2, '0')}`;
   }
   return '';
 }
 
+function checkExpiry(dateStr) {
+  if (!dateStr || dateStr === 'غير متوفر') return false;
+  let parts = dateStr.split('/');
+  if (parts.length !== 3) return false;
+  let year = parseInt(parts[0], 10), month = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+  
+  if (year >= 1900) {
+    let expDate = new Date(year, month - 1, day), today = new Date(); today.setHours(0,0,0,0);
+    return expDate < today;
+  } else {
+    try {
+        let formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        let partsArr = formatter.formatToParts(new Date());
+        let hy = partsArr.find(p => p.type === 'year').value.replace(/\D/g, ''); 
+        let hm = partsArr.find(p => p.type === 'month').value;
+        let hd = partsArr.find(p => p.type === 'day').value;
+        let currentHijriStr = `${hy}/${hm.padStart(2, '0')}/${hd.padStart(2, '0')}`;
+        let formattedExp = `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
+        return formattedExp < currentHijriStr;
+    } catch(e) { return false; }
+  }
+}
+
 function extractFields(text){
   const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
   
-  const idNumberMatch = text.match(/\b[12]\d{9}\b/) || text.match(/\b\d{10}\b/);
-  const idNumber = idNumberMatch ? idNumberMatch[0] : '';
+  const idMatch = text.match(/\b2\d{9}\b/);
+  let idNumber = idMatch ? idMatch[0] : '';
+  if (idNumber && idNumber.startsWith('29')) idNumber = '26' + idNumber.substring(2);
 
+  const empIdMatch = text.match(/\b[17]\d{9}\b/);
+  const empId = empIdMatch ? empIdMatch[0] : '';
+  
   const allDatesMatch = [...text.matchAll(/(\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}|\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/g)].map(m => parseAndFixDate(m[0]));
   const uniqueDates = [...new Set(allDatesMatch)].filter(Boolean).sort();
-  
   let dob = uniqueDates.length > 0 ? uniqueDates[0] : 'غير متوفر';
   let expiry = uniqueDates.length > 1 ? uniqueDates[uniqueDates.length - 1] : (uniqueDates.length === 1 ? uniqueDates[0] : 'غير متوفر');
 
@@ -418,38 +436,22 @@ function extractFields(text){
     let l = lines[i];
     if(l.includes('الميلاد') || l.includes('تاريخ الميلاد')){
       let m = l.match(/(\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}|\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/);
-      if(m) dob = parseAndFixDate(m[0]);
-      else if(i+1 < lines.length){
-        let dm = parseAndFixDate(lines[i+1]);
-        if(dm) dob = dm;
-      }
+      if(m) dob = parseAndFixDate(m[0]); else if(i+1 < lines.length) dob = parseAndFixDate(lines[i+1]) || dob;
     }
     if(l.includes('انتهاء') || l.includes('الانتهاء')){
       let m = l.match(/(\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}|\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/);
-      if(m) expiry = parseAndFixDate(m[0]);
-      else if(i+1 < lines.length){
-        let em = parseAndFixDate(lines[i+1]);
-        if(em) expiry = em;
-      }
+      if(m) expiry = parseAndFixDate(m[0]); else if(i+1 < lines.length) expiry = parseAndFixDate(lines[i+1]) || expiry;
     }
   }
 
-  let nameAr = 'غير متوفر';
-  let nameEn = 'غير متوفر';
+  let nameAr = 'غير متوفر', nameEn = 'غير متوفر';
   const ignoreWords = ['المملكة', 'العربية', 'السعودية', 'وزارة', 'الداخلية', 'هوية', 'مقيم', 'رقم', 'النسخة', 'الاقامة', 'الإقامة', 'الجنسية', 'الميلاد', 'الانتهاء', 'المهنة', 'صاحب', 'العمل', 'الشروط', 'الاحكام', 'المنشأة', 'مكان', 'الإسلام', 'الديانة'];
-
   for(let l of lines){
     if(nameAr === 'غير متوفر' && /^[\u0600-\u06FF\s]{6,50}$/.test(l) && !/\d/.test(l)){
-      let words = l.split(/\s+/);
-      if(words.length >= 3 && !ignoreWords.some(w => l.includes(w))){
-        nameAr = l;
-      }
+      let words = l.split(/\s+/); if(words.length >= 3 && !ignoreWords.some(w => l.includes(w))) nameAr = l;
     }
     if(nameEn === 'غير متوفر' && /^[A-Z\s]{6,60}$/.test(l) && !l.includes('SAUDI') && !l.includes('MINISTRY') && !l.includes('PASSPORT')){
-      let words = l.split(/\s+/);
-      if(words.length >= 3){
-        nameEn = l;
-      }
+      let words = l.split(/\s+/); if(words.length >= 3) nameEn = l;
     }
   }
 
@@ -457,59 +459,31 @@ function extractFields(text){
   for(let i=0; i<lines.length; i++){
     let l = lines[i];
     if(l.includes('الجنسية') || l.includes('الجنسيه') || l.includes('مكان الميلاد') || l.includes('الميلاد')){
-      let found = matchStrictNationality(l);
-      if(found){
-        nationality = found;
-        break;
-      }
-      if(i+1 < lines.length){
-        let nextFound = matchStrictNationality(lines[i+1]);
-        if(nextFound){
-          nationality = nextFound;
-          break;
-        }
-      }
+      let found = matchStrictNationality(l) || (i+1 < lines.length ? matchStrictNationality(lines[i+1]) : '');
+      if(found){ nationality = found; break; }
     }
   }
-
-  if(nationality === 'غير متوفر'){
-    let globalFound = matchStrictNationality(text);
-    if(globalFound) nationality = globalFound;
-  }
+  if(nationality === 'غير متوفر') nationality = matchStrictNationality(text) || nationality;
 
   let profession = 'غير متوفر';
   const invalidProfWords = ['هوية مقيم', 'رقم النسخة', 'المملكة', 'وزارة الداخلية', 'الديانة', 'الإسلام', 'صاحب العمل', 'مكان الإصدار', 'الرياض', 'جدة', 'الدمام'];
-
   for(let i=0; i<lines.length; i++){
     let l = lines[i];
     if(l.includes('المهنة') || l.includes('المهنه') || l.includes('الوظيفة')){
-      let parts = l.split(':');
-      let val = parts.length > 1 ? parts[1].trim() : '';
-      if(!val && i+1 < lines.length) val = lines[i+1].trim();
-      else if(!val) val = l.replace(/المهنة|المهنه|الوظيفة/g, '').replace(/[:\-]/g, '').trim();
-
-      for(let nat of exactNationalities){
-        if(val.includes(nat)) val = val.replace(nat, '').trim();
-      }
+      let parts = l.split(':'); let val = parts.length > 1 ? parts[1].trim() : '';
+      if(!val && i+1 < lines.length) val = lines[i+1].trim(); else if(!val) val = l.replace(/المهنة|المهنه|الوظيفة/g, '').replace(/[:\-]/g, '').trim();
+      for(let nat of exactNationalities) val = val.replace(nat, '').trim();
       val = val.replace(/[\/\-\.\(\)]/g, '').trim();
-      let isBad = invalidProfWords.some(w => val.includes(w)) || /^\d+$/.test(val);
-      if(val.length > 1 && !isBad){
-        profession = val;
-        break;
-      }
+      if(val.length > 1 && !invalidProfWords.some(w => val.includes(w)) && !/^\d+$/.test(val)){ profession = val; break; }
     }
   }
-
   if(profession === 'غير متوفر'){
     const commonProfessions = ['عامل', 'فني', 'مهندس', 'مراقب', 'سائق', 'محاسب', 'مساعد', 'طباخ', 'نجار', 'حداد', 'حارس', 'مدير', 'مندوب', 'مستشار', 'بناء', 'تحميل', 'تنقيل', 'منسق حركة رافعات', 'إنشاءات', 'انشاعات'];
     for(let l of lines){
       for(let prof of commonProfessions){
-        if(l.includes(prof) && !l.includes('صاحب العمل') && !l.includes('الجنسية') && !l.includes('الرياض')){
+        if(l.includes(prof) && !l.includes('صاحب العمل') && !l.includes('الجنسية')){
           let clean = l.replace(/.*[:\-]/, '').trim();
-          if(clean.length > 1 && !invalidProfWords.some(w => clean.includes(w))){
-            profession = clean;
-            break;
-          }
+          if(clean.length > 1 && !invalidProfWords.some(w => clean.includes(w))){ profession = clean; break; }
         }
       }
       if(profession !== 'غير متوفر') break;
@@ -517,265 +491,173 @@ function extractFields(text){
   }
 
   let empName = 'غير متوفر';
-  let empId = 'غير متوفر';
   const ignoreEmpPhrases = ['يجب التحقق', 'من الرمز', 'السريع', 'قبل اعتماد', 'التعامل مع الهوية', 'وزارة الداخلية', 'هوية مقيم', 'رقم النسخة'];
-
   for(let i=0; i<lines.length; i++){
     let l = lines[i];
     if(l.includes('صاحب العمل') || l.includes('المنشأة')){
-      let parts = l.split(':');
-      let val = parts.length > 1 ? parts[1].trim() : '';
+      let parts = l.split(':'); let val = parts.length > 1 ? parts[1].trim() : '';
       if(!val && i+1 < lines.length) val = lines[i+1].trim();
-      
-      for(let ph of ignoreEmpPhrases){
-        if(val.includes(ph)) val = val.substring(0, val.indexOf(ph)).trim();
-      }
+      for(let ph of ignoreEmpPhrases) if(val.includes(ph)) val = val.substring(0, val.indexOf(ph)).trim();
       if(val && !/^\d+$/.test(val) && val.length > 3) empName = val.replace(/[:\-]+/g, '').trim();
     }
   }
-
   if(empName === 'غير متوفر'){
     for(let l of lines){
       if((l.includes('شركة') || l.includes('مؤسسة') || l.includes('مكتب')) && !l.includes('هوية') && !l.includes('رقم')){
         let clean = l.replace(/.*[:\-]/, '').trim();
-        for(let ph of ignoreEmpPhrases){
-          if(clean.includes(ph)) clean = clean.substring(0, clean.indexOf(ph)).trim();
-        }
-        if(clean.length > 3){
-          empName = clean;
-          break;
-        }
+        for(let ph of ignoreEmpPhrases) if(clean.includes(ph)) clean = clean.substring(0, clean.indexOf(ph)).trim();
+        if(clean.length > 3){ empName = clean; break; }
       }
     }
   }
 
-  let allTenDigits = [...text.matchAll(/\b\d{10}\b/g)].map(m => m[0]);
-  for(let num of allTenDigits){
-    if(num !== idNumber){
-      empId = num;
-      break;
-    }
-  }
+  let notesArr = [];
+  if (checkExpiry(expiry)) notesArr.push("الهوية منتهية");
+  if (empId && empId.startsWith('1')) notesArr.push("ليس لديه تصريح بالعمل");
 
-  return { nameAr, nameEn, idNumber: idNumber || 'غير_متوفر', dob, expiry, nationality, profession, empName, empId };
+  return { 
+    nameAr, nameEn, idNumber: idNumber || 'غير_متوفر', dob, expiry, nationality, profession, empName, empId: empId || 'غير_متوفر', notes: notesArr.join(' - ')
+  };
 }
 
 function processFullQuality(file){
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
-
-    const timeoutId = setTimeout(() => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('انتهت مهلة تحميل الصورة (ملف تالف أو كبير جدًا)'));
-    }, 15000);
-
+    const timeoutId = setTimeout(() => { URL.revokeObjectURL(objectUrl); reject(new Error('ملف تالف أو كبير جدًا')); }, 15000);
     img.onload = () => {
       clearTimeout(timeoutId);
       try {
-        const maxDim = 2000;
-        const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+        const maxDim = 2000, scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
         const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.naturalWidth * scale);
-        canvas.height = Math.round(img.naturalHeight * scale);
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.width = Math.round(img.naturalWidth * scale); canvas.height = Math.round(img.naturalHeight * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        URL.revokeObjectURL(objectUrl);
-        resolve(dataUrl);
-      } catch(e){
-        URL.revokeObjectURL(objectUrl);
-        reject(e);
-      }
+        URL.revokeObjectURL(objectUrl); resolve(dataUrl);
+      } catch(e){ URL.revokeObjectURL(objectUrl); reject(e); }
     };
-    img.onerror = () => {
-      clearTimeout(timeoutId);
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('تعذّر فتح الصورة (صيغة غير مدعومة أو ملف تالف)'));
-    };
+    img.onerror = () => { clearTimeout(timeoutId); URL.revokeObjectURL(objectUrl); reject(new Error('ملف غير مدعوم')); };
     img.src = objectUrl;
   });
 }
 
 async function callOcrWithKey(base64Img, keyEntry){
   const body = new URLSearchParams();
-  body.append('apikey', keyEntry.key);
-  body.append('base64Image', base64Img);
-  body.append('language', 'ara');
-  body.append('isOverlayRequired', 'false');
-  body.append('detectOrientation', 'true');
-  body.append('scale', 'true');
-  body.append('OCREngine', '3');
+  body.append('apikey', keyEntry.key); body.append('base64Image', base64Img); body.append('language', 'ara');
+  body.append('isOverlayRequired', 'false'); body.append('detectOrientation', 'true'); body.append('scale', 'true'); body.append('OCREngine', '3');
 
   const resp = await fetch('https://api.ocr.space/parse/image', { method: 'POST', body: body });
   const rawText = await resp.text();
 
   if(resp.status === 429){
-    let retryAfter = 3660;
-    try{ retryAfter = JSON.parse(rawText).retryAfter || retryAfter; }catch(e){}
+    let retryAfter = 3660; try{ retryAfter = JSON.parse(rawText).retryAfter || retryAfter; }catch(e){}
     keyEntry.cooldownUntil = Date.now() + (retryAfter * 1000) + 2000;
-    const err = new Error('تجاوز المفتاح حد الاستخدام');
-    err.isRateLimit = true;
-    throw err;
+    const err = new Error('تجاوز المفتاح حد الاستخدام'); err.isRateLimit = true; throw err;
   }
-
-  if(!resp.ok){
-    throw new Error(`HTTP ${resp.status}: ` + rawText.substring(0, 200));
-  }
-
-  let json;
-  try{
-    json = JSON.parse(rawText);
-  }catch(parseErr){
-    throw new Error('الرد مش JSON صالح: ' + rawText.substring(0, 200));
-  }
-
+  if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  
+  let json; try{ json = JSON.parse(rawText); }catch(parseErr){ throw new Error('الرد مش JSON صالح'); }
   if(json.IsErroredOnProcessing || !json.ParsedResults){
-    const reason = json.ErrorMessage ? (Array.isArray(json.ErrorMessage) ? json.ErrorMessage.join(' ') : json.ErrorMessage) : (json.ErrorDetails || 'مجهول');
+    const reason = json.ErrorMessage ? (Array.isArray(json.ErrorMessage) ? json.ErrorMessage.join(' ') : json.ErrorMessage) : 'مرفوضة';
     throw new Error(reason);
   }
-
   return json;
 }
 
 async function processOneFile(file, attemptsLeft){
   const base64Img = await processFullQuality(file);
   let lastErr = null;
-
   while(attemptsLeft > 0){
-    const keyEntry = pickAvailableKey();
-    const waitMs = keyEntry.cooldownUntil - Date.now();
+    const keyEntry = pickAvailableKey(); const waitMs = keyEntry.cooldownUntil - Date.now();
     if(waitMs > 0){
       progLabel.textContent = `⏳ انتظار ${Math.ceil(waitMs/60000)} دقيقة (الملف: ${file.name})`;
-      await new Promise(r => setTimeout(r, Math.min(waitMs, 65000)));
-      continue;
+      await new Promise(r => setTimeout(r, Math.min(waitMs, 65000))); continue;
     }
     try{
       const json = await callOcrWithKey(base64Img, keyEntry);
       return { json, base64Img };
     }catch(err){
-      lastErr = err;
-      if(err.isRateLimit){
-        attemptsLeft--;
-        continue;
-      }
-      throw err;
+      lastErr = err; if(err.isRateLimit){ attemptsLeft--; continue; } throw err;
     }
   }
-  throw lastErr || new Error('تعذّرت المعالجة بعد استنفاد المفاتيح');
+  throw lastErr || new Error('استنفاد المفاتيح');
 }
 
 async function startProcessing(){
   keyPool = parseKeys().map(k => ({ key: k, cooldownUntil: 0 }));
-  if(keyPool.length === 0){ alert('برجاء إدخال مفتاح OCR.space API.'); return; }
-  keyRotationIndex = 0;
-
-  progWrap.style.display = 'block';
+  if(keyPool.length === 0){ alert('برجاء إدخال مفتاح OCR.space'); return; }
+  keyRotationIndex = 0; progWrap.style.display = 'block';
 
   for(let i = 0; i < selectedFiles.length; i++){
-    if(isCancelled){
-      progLabel.textContent = `⏹️ تم الإيقاف.`;
-      stopBtn.style.display = 'none';
-      return;
-    }
+    if(isCancelled){ progLabel.textContent = `⏹ تم الإيقاف.`; stopBtn.style.display = 'none'; return; }
 
     const file = selectedFiles[i];
     const progress = Math.round(((i) / selectedFiles.length) * 100);
-    progFill.style.width = progress + '%';
-    progLabel.textContent = `جاري معالجة الملف (${i + 1} من ${selectedFiles.length}): ${file.name}`;
+    progFill.style.width = progress + '%'; progLabel.textContent = `معالجة (${i + 1}/${selectedFiles.length}): ${file.name}`;
 
     try {
       const { json, base64Img } = await processOneFile(file, keyPool.length * 3);
       const text = json.ParsedResults.map(r => r.ParsedText).join('\n');
       const normText = normalizeDigits(text);
       const f = extractFields(normText);
-      const ext = file.name.substring(file.name.lastIndexOf('.')) || '.jpg';
+      
+      if(f.idNumber === 'غير_متوفر' || !f.idNumber) throw new Error("لم يتم العثور على رقم هوية صحيح (10 أرقام تبدأ بـ 2)");
 
+      const ext = file.name.substring(file.name.lastIndexOf('.')) || '.jpg';
       const item = {
-        fileName: file.name,
-        nameAr: f.nameAr,
-        nameEn: f.nameEn,
-        idNumber: f.idNumber,
-        dob: f.dob,
-        expiry: f.expiry,
-        nationality: f.nationality,
-        profession: f.profession,
-        empName: f.empName,
-        empId: f.empId,
-        ext: ext,
-        imageBase64: base64Img // إرفاق الصورة للإرسال
+        fileName: file.name, nameAr: f.nameAr, nameEn: f.nameEn, idNumber: f.idNumber, dob: f.dob, expiry: f.expiry,
+        nationality: f.nationality, profession: f.profession, empName: f.empName, empId: f.empId, notes: f.notes,
+        ext: ext, imageBase64: base64Img
       };
 
       processedData.push(item);
       addRowToTable(item, processedData.length);
-      sendToSheet('success', item);
+      sendToSheet('success', item); // حفظ للشيت + درايف
     } catch(err) {
-      console.error('خطأ في معالجة الملف:', file.name, err.message);
       failedFiles.push({ name: file.name, reason: err.message });
       addFailedRowToTable(file.name, err.message);
       sendToSheet('failed', { name: file.name, reason: err.message });
     }
 
-    if(!isCancelled && i < selectedFiles.length - 1){
-      await new Promise(r => setTimeout(r, 1000));
-    }
+    if(!isCancelled && i < selectedFiles.length - 1) await new Promise(r => setTimeout(r, 1000));
   }
 
   progFill.style.width = '100%';
-  progLabel.textContent = `✅ تمت معالجة (${processedData.length}) صورة بنجاح.`;
+  const failNote = failedFiles.length ? ` — فشلت (${failedFiles.length})` : '';
+  progLabel.textContent = `✅ تمت معالجة (${processedData.length}) صورة بنجاح${failNote}`;
   stopBtn.style.display = 'none';
 }
 
 document.getElementById('downloadExcel').addEventListener('click', () => {
   if(processedData.length === 0) return;
-  let csvContent = "\uFEFFم,الاسم بالعربي,الاسم بالإنجليزية,رقم الهوية,تاريخ الميلاد,الانتهاء,الجنسية,المهنة,صاحب العمل,هوية صاحب العمل\n";
+  let csvContent = "\uFEFFم,الاسم بالعربي,الاسم بالإنجليزية,رقم الهوية,تاريخ الميلاد,الانتهاء,الجنسية,المهنة,صاحب العمل,هوية صاحب العمل,ملاحظات\n";
   processedData.forEach((row, idx) => {
-    csvContent += `"${idx + 1}","${row.nameAr}","${row.nameEn}","${row.idNumber}","${row.dob}","${row.expiry}","${row.nationality}","${row.profession}","${row.empName}","${row.empId}"\n`;
+    csvContent += `"${idx + 1}","${row.nameAr}","${row.nameEn}","${row.idNumber}","${row.dob}","${row.expiry}","${row.nationality}","${row.profession}","${row.empName}","${row.empId}","${row.notes}"\n`;
   });
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'Residencies_Data.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Residencies_Data.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 });
 
 document.getElementById('downloadBat').addEventListener('click', () => {
   if(processedData.length === 0) return;
-  let batContent = "@echo off\r\nchcp 65001 > nul\r\necho جاري إعادة تسمية الصور المعالجة...\r\n\r\n";
-  processedData.forEach(row => {
-    if(row.idNumber && row.idNumber !== 'غير_متوفر'){
-      batContent += `ren "${row.fileName}" "${row.idNumber}${row.ext}"\r\r\n`;
-    }
-  });
-  batContent += "\r\necho.\r\necho تم الانتهاء من إعادة تسمية الصور بنجاح!\r\npause\r\n";
+  let batContent = "@echo off\r\nchcp 65001 > nul\r\necho جاري إعادة التسمية...\r\n\r\n";
+  processedData.forEach(row => { if(row.idNumber && row.idNumber !== 'غير_متوفر') batContent += `ren "${row.fileName}" "${row.idNumber}${row.ext}"\r\r\n`; });
+  batContent += "\r\necho.\r\necho تم!\r\npause\r\n";
   const blob = new Blob([batContent], { type: 'text/plain;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const aElem = document.createElement('a');
-  aElem.href = url;
-  aElem.download = 'Rename_Images.bat';
-  document.body.appendChild(aElem);
-  aElem.click();
-  document.body.removeChild(aElem);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Rename_Images.bat';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 });
 
 document.getElementById('downloadFailed').addEventListener('click', () => {
   if(failedFiles.length === 0) return;
   let csvContent = "\uFEFFم,اسم الملف,سبب الفشل\n";
   failedFiles.forEach((f, idx) => {
-    const safeReason = (f.reason || '').replace(/"/g, '""');
-    csvContent += `"${idx + 1}","${f.name}","${safeReason}"\n`;
+    csvContent += `"${idx + 1}","${f.name}","${(f.reason || '').replace(/"/g, '""')}"\n`;
   });
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'Failed_Images.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Failed_Images.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 });
 </script>
 </body>
